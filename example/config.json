@@ -1,0 +1,9 @@
+{
+    "mqtt": {
+        "host": "mqttHost",
+        "port": 1883
+    },
+    "websocket": {
+        "port": 8080
+    }
+}
