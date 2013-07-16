@@ -23,7 +23,9 @@ var optimist = require('optimist'),
         'help': 'Show this help'
     })
     .argv,
-    errno = require('errno');
+    errno = require('errno'),
+    log4js = require('log4js'),
+    logger = log4js.getLogger();
 
 if (myArgs.help) {
     optimist.showHelp();
@@ -45,10 +47,10 @@ var config = {
 // otherwise just parse command line
 if (myArgs.c || myArgs.configFile) {
     var configFile = myArgs.c || myArgs.configFile;
-    console.log("Reading configuration from %s", configFile);
+    logger.info("Reading configuration from %s", configFile);
     require('fs').readFile(configFile, 'utf8', function(err, data) {
         if (err) {
-            console.log("Error reading config file %s: %s", configFile, err);
+            logger.info("Error reading config file %s: %s", configFile, err);
             process.exit(-1);
         }
         config = underscore.extend(config, JSON.parse(data));
@@ -94,8 +96,12 @@ function getErrnoDescription(err) {
 
 // Start the bridge
 function run(config) {
+    if (config.log4js) {
+        log4js.configure(config.log4js);
+    }
+
     // Create our bridge
-    console.log("Listening for incoming WebSocket connections on port %d",
+    logger.info("Listening for incoming WebSocket connections on port %d",
         config.websocket.port);
     bridge = require('../lib/mqtt-ws').createBridge(config);
 
@@ -103,9 +109,9 @@ function run(config) {
     bridge.on('wserror', function(err, mqtt, ws) {
         if (err.syscall != undefined) {
             var description = getErrnoDescription(err) || err.code;
-            console.error("WebSocket Error: %s", description);
+            logger.error("WebSocket Error: %s", description);
         } else {
-            console.error("Websocket error: %s", err);
+            logger.error("Websocket error: %s", err);
         }
         if (ws) {
             ws.terminate();
@@ -115,48 +121,48 @@ function run(config) {
     bridge.on('mqtterror', function(err, mqtt, ws) {
         if (err.syscall == 'connect') {
             var description = getErrnoDescription(err) || err.code;
-            console.error("Error connecting to MQTT server at %s:%d: %s",
+            logger.error("Error connecting to MQTT server at %s:%d: %s",
                 mqtt.host, mqtt.port, description);
             mqtt.end();
         } else if (err.syscall) {
             var description = getErrnoDescription(err) || err.code;
-            console.error("MQTT Error: %s", description);
+            logger.error("MQTT Error: %s", description);
             mqtt.end();
         } else {
-            console.error("MQTT %s", err);
+            logger.error("MQTT %s", err);
         }
     });
 
     // Handle incoming WS connection
     bridge.on('wsconnection', function(ws, mqtt) {
         // URL-decode the URL, and use the URI part as the subscription topic
-        console.log("WebSocket connection from %s received", ws.connectString);
+        logger.info("WebSocket connection from %s received", ws.connectString);
         mqtt.topic = decodeURIComponent(ws.upgradeReq.url.substring(1));
     });
 
     // Log our MQTT connection
     bridge.on('mqttconnection', function(mqtt, ws) {
-        console.log("Connected to MQTT server at %s:%d", config.mqtt.host, config.mqtt.port);
-        console.log("WebSocket client %s subscribing to '%s'", ws.connectString, mqtt.topic);
+        logger.info("Connected to MQTT server at %s:%d", config.mqtt.host, config.mqtt.port);
+        logger.info("WebSocket client %s subscribing to '%s'", ws.connectString, mqtt.topic);
         mqtt.subscribe(mqtt.topic);
     });
 
     // Publish any WS messages on our topic. Note that if the topic is a wildcard,
     // nothing will be published, and no error raised
     bridge.on('wsmessage', function(message, ws, mqtt) {
-        console.log("WebSocket client %s publishing '%s' to %s",
+        logger.info("WebSocket client %s publishing '%s' to %s",
             ws.connectString, message, topics[ws]);
         mqtt.publish(mqtt.topic, message);
     });
 
     // Log the client closing connection, and delete from our topics list
     bridge.on('mqttclose', function(mqtt, ws) {
-        console.log("MQTT connection for client %s closed",
+        logger.info("MQTT connection for client %s closed",
             ws.connectString);
     });
 
     // Log the client closing connection, and delete from our topics list
     bridge.on('wsclose', function(mqtt, ws) {
-        console.log("Websocket client %s closed", ws.connectString);
+        logger.info("Websocket client %s closed", ws.connectString);
     });
 };
