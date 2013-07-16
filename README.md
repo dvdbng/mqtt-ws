@@ -1,4 +1,4 @@
-# mqttws
+# mqtt-ws
 [MQTT](http://mqtt.org/)/[WebSocket](http://en.wikipedia.org/wiki/WebSocket) bridge. Runs as a WebSocket server and connects to an MQTT server. WebSocket clients subscribe to an MQTT topic by specifying the topic as part of the WebSocket URL, like so: `ws://localhost/topic`. For instance, if I wanted to subscribe to `/sensors/server_room/temperature`, and my bridge was running on host `bridgehost`, I would use the URL `ws://bridgehost/sensors/server_room/temperature`. The client would then begin receiving data on the topic through the connection, and could even publish by sending data on the WS connection.
 
 You can also subscribe to wildcard topics the same way (URL encoded, of course), but you won't be able to publish on any wildcard topics.
