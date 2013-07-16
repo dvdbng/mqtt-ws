@@ -3,10 +3,14 @@
 
 You can also subscribe to wildcard topics the same way (URL encoded, of course), but you won't be able to publish on any wildcard topics.
 
-This module uses Einar Stangvik's [ws](https://github.com/einaros/ws) module for the WebSocket side, and Adam Rudd's [mqtt.js](https://github.com/adamvr/MQTT.js) package for the MQTT side.
+This module uses Einar Stangvik's [ws](https://github.com/einaros/ws) module for the WebSocket side, and Adam Rudd's [mqtt.js](https://github.com/adamvr/MQTT.js) module for the MQTT side.
 
 ## Usage
-    Usage: node mqttwsBridge.js
+### Installation
+    $ npm install mqtt-ws
+
+### Bridge
+    Usage: mqttwsBridge
 
     Options:
       -p, --port        MQTT port to connect to      [default: 1883]
@@ -29,3 +33,6 @@ If you specify a configuration file on the command line, it is expecting a JSON-
     }
 
 The `mqtt` section specifies the MQTT connection parameters - `host` and `port`, and the `websocket` section is configuration information passed to the `ws` module.
+
+## Logging
+Logging is done via [log4js](https://github.com/nomiddlename/log4js-node). Configuration for it may be added in the configuration file under key "log4js"; see the example in the `example` folder. By default, everything logs to the console.

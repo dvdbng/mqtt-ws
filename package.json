@@ -1,28 +1,29 @@
 {
-  "name": "mqttws",
+  "name": "mqtt-ws",
   "version": "0.1.0",
-  "description": "a node.js MQTT/WebSocket bridge",
+  "description": "a Node.js MQTT/WebSocket bridge",
   "author": "Jack Lund <jack@m2mconnectionsinc.com>",
   "license": "MIT",
   "readmeFilename": "README.md",
   "preferGlobal": true,
-  "main": "bridge.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified! Configure in package.json\" && exit 1"
-  },
+  "main": "lib/mqtt-ws.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/M2MConnections/mqttws"
+    "url": "https://github.com/M2MConnections/mqtt-ws"
   },
   "bugs": {
-    "url": "https://github.com/M2MConnections/mqttws/issues"
+    "url": "https://github.com/M2MConnections/mqtt-ws/issues"
   },
   "dependencies": {
+    "errno": "*",
     "mqtt": "*",
-    "ws": "*",
     "optimist": "*",
     "options": ">=0.0.5",
-    "underscore": "*"
+    "underscore": "*",
+    "ws": "*"
+  },
+  "engines": {
+    "node": ">=0.4.0"
   },
   "keywords": [
     "Node.js",
@@ -30,10 +31,14 @@
     "MQTT"
   ],
   "bin": {
-    "mqttwsBridge": "mqttwsBridge.js"
+    "mqttwsBridge": "bin/mqttwsBridge.js"
   },
   "directories": {
     "example": "example"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "gitHead": "a30ac1a692b869b50c6ea56679618e61eaeec8b4",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
 }
