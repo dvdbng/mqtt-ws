@@ -5,5 +5,18 @@
     },
     "websocket": {
         "port": 8080
+    },
+    "log4js": {
+  		"appenders": [
+		      {
+		          "type": "console"
+		      },
+		      {
+		          "type": "file",
+		          "filename": "mqttwsBridge.log",
+		          "maxLogSize": 1024,
+		          "backups": 3
+		      }
+		 ]
     }
 }
