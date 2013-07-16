@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "errno": "*",
+    "log4js": "*",
     "mqtt": "*",
     "optimist": "*",
     "options": ">=0.0.5",
