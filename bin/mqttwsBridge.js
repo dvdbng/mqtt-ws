@@ -23,25 +23,17 @@ var optimist = require('optimist'),
         'help': 'Show this help'
     })
     .argv,
+    url = require('url'),
+    util = require('util'),
     errno = require('errno'),
     log4js = require('log4js'),
-    logger = log4js.getLogger();
+    logger = log4js.getLogger(),
+    mqttws = require('../lib/mqtt-ws');
 
 if (myArgs.help) {
     optimist.showHelp();
     process.exit(0);
 }
-
-var underscore = require('underscore');
-var config = {
-    "mqtt": {
-        "host": "localhost",
-        "port": 1883,
-    },
-    "websocket": {
-        "port": 80
-    }
-};
 
 // If we are given a config file, parse that,
 // otherwise just parse command line
@@ -53,11 +45,11 @@ if (myArgs.c || myArgs.configFile) {
             logger.info("Error reading config file %s: %s", configFile, err);
             process.exit(-1);
         }
-        config = underscore.extend(config, JSON.parse(data));
+        config = JSON.parse(data);
         run(parseCommandLine(myArgs, config));
     });
 } else {
-    run(parseCommandLine(myArgs, config));
+    run(parseCommandLine(myArgs, {mqtt: {}, websocket: {}}));
 }
 
 // Parse the command line
@@ -94,6 +86,15 @@ function getErrnoDescription(err) {
     }
 }
 
+function logError(err, message) {
+    if (err.syscall != undefined) {
+        var description = getErrnoDescription(err) || err.code;
+        logger.error("%s on %s: %s", message, err.syscall, description);
+    } else {
+        logger.error("%s: %s", message, err);
+    }
+}
+
 // Start the bridge
 function run(config) {
     if (config.log4js) {
@@ -101,68 +102,66 @@ function run(config) {
     }
 
     // Create our bridge
+    bridge = mqttws.createBridge(config);
     logger.info("Listening for incoming WebSocket connections on port %d",
-        config.websocket.port);
-    bridge = require('../lib/mqtt-ws').createBridge(config);
+        bridge.port);
 
     // Set up error handling
-    bridge.on('wserror', function(err, mqtt, ws) {
-        if (err.syscall != undefined) {
-            var description = getErrnoDescription(err) || err.code;
-            logger.error("WebSocket Error: %s", description);
-        } else {
-            logger.error("Websocket error: %s", err);
-        }
-        if (ws) {
-            ws.terminate();
-        }
-    });
-
-    bridge.on('mqtterror', function(err, mqtt, ws) {
-        if (err.syscall == 'connect') {
-            var description = getErrnoDescription(err) || err.code;
-            logger.error("Error connecting to MQTT server at %s:%d: %s",
-                mqtt.host, mqtt.port, description);
-            mqtt.end();
-        } else if (err.syscall) {
-            var description = getErrnoDescription(err) || err.code;
-            logger.error("MQTT Error: %s", description);
-            mqtt.end();
-        } else {
-            logger.error("MQTT %s", err);
-        }
+    bridge.on('error', function(err) {
+        logError(err, "WebSocket Error");
     });
 
     // Handle incoming WS connection
-    bridge.on('wsconnection', function(ws, mqtt) {
+    bridge.on('connection', function(ws) {
         // URL-decode the URL, and use the URI part as the subscription topic
         logger.info("WebSocket connection from %s received", ws.connectString);
-        mqtt.topic = decodeURIComponent(ws.upgradeReq.url.substring(1));
-    });
 
-    // Log our MQTT connection
-    bridge.on('mqttconnection', function(mqtt, ws) {
-        logger.info("Connected to MQTT server at %s:%d", config.mqtt.host, config.mqtt.port);
-        logger.info("WebSocket client %s subscribing to '%s'", ws.connectString, mqtt.topic);
-        mqtt.subscribe(mqtt.topic);
-    });
+        var self = this;
 
-    // Publish any WS messages on our topic. Note that if the topic is a wildcard,
-    // nothing will be published, and no error raised
-    bridge.on('wsmessage', function(message, ws, mqtt) {
-        logger.info("WebSocket client %s publishing '%s' to %s",
-            ws.connectString, message, topics[ws]);
-        mqtt.publish(mqtt.topic, message);
-    });
+        ws.on('error', function(err) {
+            logError(err, util.format("WebSocket error in client %s", ws.connectString));
+        });
 
-    // Log the client closing connection, and delete from our topics list
-    bridge.on('mqttclose', function(mqtt, ws) {
-        logger.info("MQTT connection for client %s closed",
-            ws.connectString);
-    });
+        // Parse the URL
+        var parsed = url.parse(ws.upgradeReq.url, true);
+        // Connect to the MQTT server using the URL query as options
+        var mqtt = bridge.connectMqtt(parsed.query);
+        mqtt.topic = decodeURIComponent(parsed.pathname.substring(1));
+        mqtt.isWildcardTopic = (mqtt.topic.match(/[\+#]/) != null);
 
-    // Log the client closing connection, and delete from our topics list
-    bridge.on('wsclose', function(mqtt, ws) {
-        logger.info("Websocket client %s closed", ws.connectString);
+        ws.on('close', function() {
+            logger.info("WebSocket client %s closed", ws.connectString);
+            mqtt.end();
+        });
+
+        ws.on('message', function(message) {
+            logger.info("WebSocket client %s publishing '%s' to %s",
+                ws.connectString, message, mqtt.topic);
+            mqtt.publish(mqtt.topic, message, mqtt.options);
+        });
+
+        mqtt.on('error', function(err) {
+            logError(err, "MQTT error");
+        });
+
+        mqtt.on('connect', function() {
+            logger.info("Connected to MQTT server at %s:%d", mqtt.host, mqtt.port);
+            logger.info("WebSocket client %s subscribing to '%s'", ws.connectString, mqtt.topic);
+            mqtt.subscribe(mqtt.topic);
+        });
+
+        mqtt.on('close', function() {
+            logger.info("MQTT connection for client %s closed",
+                ws.connectString);
+            ws.terminate();
+        });
+
+        mqtt.on('message', function(topic, message, packet) {
+            if (mqtt.isWildcardTopic) {
+                ws.send(util.format("%s: %s", topic, message), self.options);
+            } else {
+                ws.send(message, self.options);
+            }
+        });
     });
 };
