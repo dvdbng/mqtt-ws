@@ -35,6 +35,7 @@
     "mqttwsBridge": "bin/mqttwsBridge.js"
   },
   "directories": {
+    "doc": "doc",
     "example": "example"
   },
   "devDependencies": {},
