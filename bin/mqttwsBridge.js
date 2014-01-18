@@ -166,7 +166,7 @@ function run(config) {
         });
 
         mqtt.on('message', function(topic, message, packet) {
-            ws.send(Buffer.concat([new Buffer(topic + "|", "utf16le"), new Buffer(message)]), {binary: true, mask: true});
+            ws.send(Buffer.concat([new Buffer(topic + "|", "utf16le"), new Buffer(message)]), {binary: true, mask: false});
         });
     });
 }
