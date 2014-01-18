@@ -69,15 +69,16 @@ function parseCommandLine(args, config) {
 
 function getErrnoDescription(err) {
     if (!err.errno) return undefined;
+    var e;
     if (typeof err.errno == 'number') {
-        var e = errno.errno[err.errno];
+        e = errno.errno[err.errno];
         if (e) {
             return e.description;
         } else {
             return undefined;
         }
     } else if (typeof err.errno == 'string') {
-        for (var e in errno.errno) {
+        for (e in errno.errno) {
             if (errno.errno[e].code == err.code) {
                 return errno.errno[e].description;
             }
@@ -87,7 +88,7 @@ function getErrnoDescription(err) {
 }
 
 function logError(err, message) {
-    if (err.syscall != undefined) {
+    if (err.syscall) {
         var description = getErrnoDescription(err) || err.code;
         logger.error("%s on %s: %s", message, err.syscall, description);
     } else {
@@ -127,7 +128,6 @@ function run(config) {
         // Connect to the MQTT server using the URL query as options
         var mqtt = bridge.connectMqtt(parsed.query);
         mqtt.topic = decodeURIComponent(parsed.pathname.substring(1));
-        mqtt.isWildcardTopic = (mqtt.topic.match(/[\+#]/) != null);
 
         ws.on('close', function() {
             logger.info("WebSocket client %s closed", ws.connectString);
@@ -135,9 +135,18 @@ function run(config) {
         });
 
         ws.on('message', function(message) {
-            logger.info("WebSocket client %s publishing '%s' to %s",
-                ws.connectString, message, mqtt.topic);
-            mqtt.publish(mqtt.topic, message, mqtt.options);
+            message = new Buffer(message);
+            var char = " ";
+            var topic = "";
+            var offset = 0;
+            while(char != "|" && offset < message.length){
+                topic += char;
+                char = String.fromCharCode(message.readUInt16LE(offset));
+                offset += 2;
+            }
+            topic = topic.substring(1);
+            logger.info("WebSocket client %s publishing to %s", ws.connectString, topic);
+            mqtt.publish(topic, message.slice(offset), mqtt.options);
         });
 
         mqtt.on('error', function(err) {
@@ -157,11 +166,8 @@ function run(config) {
         });
 
         mqtt.on('message', function(topic, message, packet) {
-            if (mqtt.isWildcardTopic) {
-                ws.send(util.format("%s: %s", topic, message), self.options);
-            } else {
-                ws.send(message, self.options);
-            }
+            ws.send(Buffer.concat([new Buffer(topic + "|", "utf16le"), new Buffer(message)]), {binary: true, mask: true});
         });
     });
-};
+}
+
