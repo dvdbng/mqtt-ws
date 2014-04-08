@@ -12,10 +12,14 @@ var optimist = require('optimist'),
     .alias({
         'p': 'port',
         'h': 'host',
+        's': 'sslCert',
+        'k': 'sslKey',
         'l': 'listen',
         'c': 'configFile',
     })
     .describe({
+        's': 'Path to ssl certificate file',
+        'k': 'Path to ssl key file',
         'p': 'MQTT port to connect to',
         'h': 'Hostname of MQTT server',
         'l': 'WebSocket port to listen on',
@@ -62,6 +66,12 @@ function parseCommandLine(args, config) {
     }
     if (args.l || args.listen) {
         config.websocket.port = args.l || args.listen;
+    }
+    if (args.s || args.sslCert) {
+        config.websocket.ssl_cert = args.s || args.sslCert;
+    }
+    if (args.k || args.sslKey) {
+        config.websocket.ssl_key = args.k || args.sslKey;
     }
 
     return config;
@@ -136,7 +146,7 @@ function run(config) {
 
         ws.on('message', function(message) {
             message = new Buffer(message);
-            var char = " ";
+            var char = "";
             var topic = "";
             var offset = 0;
             while(char != "|" && offset < message.length){
@@ -144,7 +154,6 @@ function run(config) {
                 char = String.fromCharCode(message.readUInt16LE(offset));
                 offset += 2;
             }
-            topic = topic.substring(1);
             logger.info("WebSocket client %s publishing to %s", ws.connectString, topic);
             mqtt.publish(topic, message.slice(offset), mqtt.options);
         });
